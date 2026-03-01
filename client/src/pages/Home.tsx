@@ -81,10 +81,10 @@ export default function Home() {
       {/* 하단 개인정보처리방침 링크 */}
       <div className="absolute bottom-8">
         <button
-          onClick={() => setLocation("/privacy")}
+          onClick={() => setLocation("/privacy?app=trash_day_kr")}
           className="text-gray-400 hover:text-gray-100 transition-colors duration-300 text-sm underline underline-offset-4 hover:no-underline"
         >
-          개인정보처리방침
+          [우리동네 분리배출] 개인정보처리방침
         </button>
       </div>
     </div>
