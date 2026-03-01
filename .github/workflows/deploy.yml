@@ -37,6 +37,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build
+        env:
+          VITE_PRIVACY_CPO_NAME: ${{ secrets.VITE_PRIVACY_CPO_NAME }}
+          VITE_PRIVACY_CPO_POSITION: ${{ secrets.VITE_PRIVACY_CPO_POSITION }}
+          VITE_PRIVACY_CPO_EMAIL: ${{ secrets.VITE_PRIVACY_CPO_EMAIL }}
+          VITE_PRIVACY_DEPT_NAME: ${{ secrets.VITE_PRIVACY_DEPT_NAME }}
         run: pnpm build
 
       - name: Setup Pages
