@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: ["main", "master"] # 메인 브랜치 이름에 맞춰 수정하세요.
+    branches: ["main", "master"]
 
   workflow_dispatch:
 
@@ -24,8 +24,6 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -34,7 +32,10 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
+
+      - name: Approve build scripts
+        run: pnpm approve-builds --allow @tailwindcss/oxide esbuild
 
       - name: Build
         run: pnpm build
@@ -45,7 +46,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './dist/public' # vite.config.ts의 outDir 설정에 맞춤
+          path: './dist/public'
 
   deploy:
     environment:
