@@ -1,8 +1,31 @@
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { ArrowLeft } from "lucide-react";
+import APP_CONFIGS, { DEFAULT_APP_KEY } from "../appConfigs";
 
 export default function Privacy() {
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
+  const params = new URLSearchParams(searchString);
+  const appKey = params.get("app") || DEFAULT_APP_KEY;
+  const config = APP_CONFIGS[appKey];
+
+  // 잘못된 app 키가 들어왔을 때
+  if (!config) {
+    return (
+      <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center justify-center p-4">
+        <p className="text-xl font-semibold mb-4">
+          요청하신 앱의 개인정보처리방침을 찾을 수 없습니다.
+        </p>
+        <button
+          onClick={() => setLocation("/")}
+          className="flex items-center gap-2 text-gray-400 hover:text-gray-100 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          홈으로 돌아가기
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 p-4">
@@ -25,7 +48,7 @@ export default function Privacy() {
           {/* 소개 */}
           <section>
             <p>
-              cow company(이하 "회사")는 「개인정보 보호법」 제30조에 따라 정보주체의 개인정보를 보호하고 이와 관련한 고충을 신속하고 원활하게 처리할 수 있도록 다음과 같이 개인정보 처리방침을 수립·공개합니다. 본 방침은 PIXEL ONE 앱(이하 "애플리케이션") 이용에 적용됩니다.
+              {config.companyName}(이하 "회사")는 「개인정보 보호법」 제30조에 따라 정보주체의 개인정보를 보호하고 이와 관련한 고충을 신속하고 원활하게 처리할 수 있도록 다음과 같이 개인정보 처리방침을 수립·공개합니다. 본 방침은 {config.appName} 앱(이하 "애플리케이션") 이용에 적용됩니다.
             </p>
           </section>
 
@@ -57,15 +80,17 @@ export default function Privacy() {
               <div>
                 <p className="font-medium text-gray-100">【필수 항목】</p>
                 <ul className="list-disc list-inside mt-1 space-y-1">
-                  <li>이메일 주소, 비밀번호(암호화 저장), 닉네임</li>
+                  <li>이메일 주소</li>
+                  <li>모바일 기기 고유 식별자(해시 처리)</li>
+                  {/* <li>이메일 주소, 비밀번호(암호화 저장), 닉네임</li>
                   <li>기기 정보(기기 모델명, OS 종류 및 버전)</li>
-                  <li>서비스 이용 기록, 접속 로그, 접속 IP 주소</li>
+                  <li>서비스 이용 기록, 접속 로그, 접속 IP 주소</li> */}
                 </ul>
               </div>
               <div>
                 <p className="font-medium text-gray-100">【선택 항목】</p>
                 <ul className="list-disc list-inside mt-1 space-y-1">
-                  <li>프로필 이미지, 연락처 정보</li>
+                  {/* <li>프로필 이미지, 연락처 정보</li> */}
                 </ul>
                 <p className="mt-1 text-xs text-gray-400">
                   ※ 선택 항목에 동의하지 않더라도 서비스 이용에는 제한이 없습니다.
@@ -347,13 +372,15 @@ export default function Privacy() {
           {/* 시행일 */}
           <section className="border-t border-gray-700 pt-6 mt-8">
             <p className="text-xs text-gray-500">
-              본 방침은 2026년 2월 27일부터 시행됩니다.
+              본 방침은 {config.effectiveDate}부터 시행됩니다.
             </p>
             <p className="text-xs text-gray-500 mt-1">
               이전 개인정보 처리방침은 아래에서 확인하실 수 있습니다.
             </p>
             <ul className="text-xs text-gray-500 mt-1">
-              <li>- 2026년 2월 27일 시행 (현행)</li>
+              {config.revisionHistory.map((rev, idx) => (
+                <li key={idx}>- {rev.date} 시행 ({rev.label})</li>
+              ))}
             </ul>
           </section>
         </div>
