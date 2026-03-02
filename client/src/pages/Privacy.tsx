@@ -369,6 +369,49 @@ export default function Privacy() {
             </p>
           </section>
 
+          {/* 15. 계정 삭제 안내 */}
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-100 mb-3">
+              15. {config.appName} 계정 삭제 안내
+            </h2>
+
+            <div className="mt-3 space-y-4">
+              {/* 앱 내 삭제 방법 */}
+              <div>
+                <p className="font-medium text-gray-200 mb-2">▶ 앱 내에서 직접 삭제</p>
+                <ol className="list-decimal list-inside space-y-1">
+                  <li>{config.appName} 앱을 실행합니다.</li>
+                  <li>설정 &gt; 메뉴로 이동합니다.</li>
+                  <li>'계정 삭제' 또는 '회원 탈퇴' 버튼을 클릭합니다.</li>
+                  <li>안내에 따라 인증 후 삭제를 완료합니다.</li>
+                </ol>
+              </div>
+
+              {/* 이메일 요청 */}
+              <div>
+                <p className="font-medium text-gray-200 mb-2">▶ 이메일로 삭제 요청</p>
+                <div className="bg-gray-900 rounded-lg p-4 space-y-2">
+                  <p>삭제 요청 이메일 : <span className="text-blue-400">{import.meta.env.VITE_PRIVACY_CPO_EMAIL || 'support@cowcompany.kr'}</span></p>
+                  <p>제목 : {config.appName} 계정 삭제 요청</p>
+                  <p>본문에 포함할 내용 :</p>
+                  <ul className="list-disc list-inside ml-2 space-y-1">
+                    <li>사용 중인 이메일 주소</li>
+                    <li>삭제 사유 (선택)</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* 삭제 처리 안내 */}
+              <div>
+                <p className="font-medium text-gray-200 mb-2">▶ 삭제 처리</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>요청 후 최대 30일 이내에 계정 및 관련 데이터(프로필, 게시물 등)를 영구 삭제합니다.</li>
+                  <li>법령상 보관 의무가 있는 일부 데이터(예: 결제 기록)는 관련 법령이 정한 기간 동안 보관 후 삭제됩니다.</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
           {/* 시행일 */}
           <section className="border-t border-gray-700 pt-6 mt-8">
             <p className="text-xs text-gray-500">
