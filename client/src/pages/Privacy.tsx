@@ -12,7 +12,7 @@ export default function Privacy() {
   // 잘못된 app 키가 들어왔을 때
   if (!config) {
     return (
-      <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen text-gray-100 flex flex-col items-center justify-center p-4 relative z-10">
         <p className="text-xl font-semibold mb-4">
           요청하신 앱의 개인정보처리방침을 찾을 수 없습니다.
         </p>
@@ -28,7 +28,7 @@ export default function Privacy() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 p-4">
+    <div className="min-h-screen text-gray-100 p-4 relative z-10">
       {/* 헤더 */}
       <div className="max-w-2xl mx-auto mb-8">
         <button

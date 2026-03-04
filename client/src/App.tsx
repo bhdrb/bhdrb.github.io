@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/sonner";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import StarfieldBackground from "./components/StarfieldBackground";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Privacy from "./pages/Privacy";
@@ -29,6 +30,7 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark">
         <Toaster />
+        <StarfieldBackground />
         <Router />
       </ThemeProvider>
     </ErrorBoundary>
