@@ -150,12 +150,49 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
+// =============================================================================
+// Github Pages SPA Routing Fix - Vite Plugin
+// Duplicates index.html to 404.html and privacy/index.html after build
+// =============================================================================
+
+function copyIndexPlugin(): Plugin {
+  return {
+    name: "copy-index-plugin",
+    apply: "build",
+    closeBundle() {
+      const outDir = path.resolve(import.meta.dirname, "dist/public");
+      const indexHtmlPath = path.join(outDir, "index.html");
+
+      if (fs.existsSync(indexHtmlPath)) {
+        // Copy to 404.html
+        const notFoundHtmlPath = path.join(outDir, "404.html");
+        fs.copyFileSync(indexHtmlPath, notFoundHtmlPath);
+        console.log(`[copy-index-plugin] Copied index.html to 404.html`);
+
+        // Copy to privacy/index.html
+        const privacyDir = path.join(outDir, "privacy");
+        if (!fs.existsSync(privacyDir)) {
+          fs.mkdirSync(privacyDir, { recursive: true });
+        }
+        const privacyHtmlPath = path.join(privacyDir, "index.html");
+        fs.copyFileSync(indexHtmlPath, privacyHtmlPath);
+        console.log(
+          `[copy-index-plugin] Copied index.html to privacy/index.html`
+        );
+      } else {
+        console.warn(`[copy-index-plugin] Could not find index.html at ${indexHtmlPath}`);
+      }
+    },
+  };
+}
+
 const isProduction = process.env.NODE_ENV === "production";
 
 const plugins = [
   react(),
   tailwindcss(),
   jsxLocPlugin(),
+  copyIndexPlugin(),
   // Only include Manus debug tools in non-production environments
   !isProduction && vitePluginManusRuntime(),
   !isProduction && vitePluginManusDebugCollector(),
