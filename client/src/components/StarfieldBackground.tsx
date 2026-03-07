@@ -34,6 +34,9 @@ export default function StarfieldBackground() {
         renderer.setClearColor(0x000000, 0);
         container.appendChild(renderer.domElement);
 
+        // ── Check if Mobile ──
+        const isMobile = window.innerWidth < 768;
+
         // ── Star Colors Palette ──
         const starColors = [
             new THREE.Color(0xffffff), // pure white
@@ -47,7 +50,7 @@ export default function StarfieldBackground() {
         ];
 
         // ── Main Stars (small, many) ──
-        const STAR_COUNT = 1200;
+        const STAR_COUNT = isMobile ? 2400 : 3600; // Increased to 3x (from 800/1200)
         const starGeometry = new THREE.BufferGeometry();
         const starPositions = new Float32Array(STAR_COUNT * 3);
         const starColorData = new Float32Array(STAR_COUNT * 3);
@@ -64,7 +67,8 @@ export default function StarfieldBackground() {
             starColorData[i3 + 1] = color.g;
             starColorData[i3 + 2] = color.b;
 
-            starSizes[i] = Math.random() * 2.5 + 0.5;
+            // Stars size significantly increased (from 3.5/1.0 to 4.5/1.5)
+            starSizes[i] = Math.random() * 4.5 + 1.5;
         }
 
         starGeometry.setAttribute(
@@ -105,8 +109,9 @@ export default function StarfieldBackground() {
           vec4 projectedPosition = projectionMatrix * viewPosition;
 
           gl_Position = projectedPosition;
-          gl_PointSize = size * uPixelRatio * (300.0 / -viewPosition.z);
-          gl_PointSize = max(gl_PointSize, 1.0);
+          // Further increased size factor
+          gl_PointSize = size * uPixelRatio * (550.0 / -viewPosition.z);
+          gl_PointSize = max(gl_PointSize, 2.0);
         }
       `,
             fragmentShader: `
@@ -133,7 +138,7 @@ export default function StarfieldBackground() {
         scene.add(stars);
 
         // ── Bright Stars (larger, fewer, more prominent glow) ──
-        const BRIGHT_STAR_COUNT = 40;
+        const BRIGHT_STAR_COUNT = isMobile ? 90 : 120; // Increased to 3x (from 30/40)
         const brightGeometry = new THREE.BufferGeometry();
         const brightPositions = new Float32Array(BRIGHT_STAR_COUNT * 3);
         const brightColorData = new Float32Array(BRIGHT_STAR_COUNT * 3);
@@ -150,7 +155,8 @@ export default function StarfieldBackground() {
             brightColorData[i3 + 1] = color.g;
             brightColorData[i3 + 2] = color.b;
 
-            brightSizes[i] = Math.random() * 5 + 3;
+            // Bright stars size significantly increased (from 7/4 to 10/6)
+            brightSizes[i] = Math.random() * 10 + 6;
         }
 
         brightGeometry.setAttribute(
@@ -191,8 +197,9 @@ export default function StarfieldBackground() {
           vec4 projectedPosition = projectionMatrix * viewPosition;
 
           gl_Position = projectedPosition;
-          gl_PointSize = size * uPixelRatio * (400.0 / -viewPosition.z);
-          gl_PointSize = max(gl_PointSize, 2.0);
+          // Further increased size factor
+          gl_PointSize = size * uPixelRatio * (750.0 / -viewPosition.z);
+          gl_PointSize = max(gl_PointSize, 4.0);
         }
       `,
             fragmentShader: `
@@ -282,27 +289,50 @@ export default function StarfieldBackground() {
             new THREE.Color(0xddbbff), // soft purple
             new THREE.Color(0xffffff), // white
         ];
-
         function spawnMeteor() {
             const color = meteorColors[Math.floor(Math.random() * meteorColors.length)];
+            const isMobile = window.innerWidth < 768;
 
-            // Start from left edge, move right
-            const startX = -900 - Math.random() * 300;
-            const startY = (Math.random() - 0.5) * 600;
-            const startZ = -100 - Math.random() * 300;
+            // Fix for resize: we capture the viewport AT THE TIME OF SPAWN.
+            // Meteors don't care if the screen resizes while they are flying.
+            const aspect = window.innerWidth / window.innerHeight;
 
-            // Direction: left to right with slight downward angle
+            // Fixed logical height based on camera frustum at Z=500 -> Z=0 distance
+            const logicalHeight = 600;
+            const logicalWidth = logicalHeight * aspect;
+
+            // Start firmly off the PRECISE left edge
+            const startX = -(logicalWidth / 2) - 100 - Math.random() * 200;
+
+            // Limit Y start to upper half mostly so trajectory moves down and across screen
+            // If aspect < 1 (mobile), allow a bit wider vertical range
+            const yRange = isMobile ? logicalHeight * 0.8 : logicalHeight * 0.6;
+            const startY = (Math.random() - 0.5) * yRange + (logicalHeight * 0.2); // Bias slightly upwards
+
+            // Meteors fly behind the UI but in front of distant stars
+            const startZ = -50 - Math.random() * 150;
+
             const dir = new THREE.Vector3(
                 1,
-                -(Math.random() * 0.25 + 0.05),
+                -(Math.random() * 0.2 + 0.1), // Gentle downward slope
                 (Math.random() - 0.5) * 0.1,
             ).normalize();
 
-            const tailLength = 600 + Math.random() * 500;
-            const speed = 5 + Math.random() * 5;
-            const maxLife = 200 + Math.random() * 150; // frames
+            // Length proportional to screen width, but bounded for extreme aspects (like ultra-wide PC)
+            const tailLength = Math.min(logicalWidth * 0.6, 800) + 100;
 
-            // Trail line (2 points: head and tail)
+            // DELTA-TIME: Use seconds (time) instead of frames for consistent UI speed
+            // Target crossing time in Seconds
+            const durationSeconds = isMobile ? (2.0 + Math.random() * 1.5) : (3.5 + Math.random() * 2.0);
+
+            // Speed = Total distance to cross screen / Seconds
+            // Distance is roughly logicalWidth + startX offset + some buffer
+            const distanceToCross = logicalWidth + Math.abs(startX) + tailLength + 200;
+            const speed = distanceToCross / durationSeconds; // Units per second
+
+            // Max life guarantees it completes the crossing + fully fades tail
+            const maxLife = durationSeconds * 1.5;
+
             const TRAIL_SEGMENTS = 20;
             const trailPositions = new Float32Array(TRAIL_SEGMENTS * 3);
             const trailAlphas = new Float32Array(TRAIL_SEGMENTS);
@@ -312,7 +342,7 @@ export default function StarfieldBackground() {
                 trailPositions[i * 3] = startX - dir.x * t * tailLength;
                 trailPositions[i * 3 + 1] = startY - dir.y * t * tailLength;
                 trailPositions[i * 3 + 2] = startZ - dir.z * t * tailLength;
-                trailAlphas[i] = 1.0 - t; // fade along trail
+                trailAlphas[i] = 1.0 - t;
             }
 
             const trailGeometry = new THREE.BufferGeometry();
@@ -337,7 +367,7 @@ export default function StarfieldBackground() {
                     uniform float uOpacity;
                     varying float vAlpha;
                     void main() {
-                        gl_FragColor = vec4(uColor, vAlpha * uOpacity * 0.3);
+                        gl_FragColor = vec4(uColor, vAlpha * uOpacity * 0.4);
                     }
                 `,
                 transparent: true,
@@ -348,15 +378,14 @@ export default function StarfieldBackground() {
             const trail = new THREE.Line(trailGeometry, trailMaterial);
             scene.add(trail);
 
-            // Glowing head point
             const headGeometry = new THREE.BufferGeometry();
             headGeometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array([startX, startY, startZ]), 3));
 
             const headMaterial = new THREE.PointsMaterial({
                 color: color,
-                size: 4,
+                size: isMobile ? 8 : 6, // Increased head size slightly for better visibility
                 transparent: true,
-                opacity: 0.5,
+                opacity: 0.8,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false,
                 sizeAttenuation: true,
@@ -369,43 +398,43 @@ export default function StarfieldBackground() {
                 line: trail,
                 head,
                 direction: dir,
-                speed,
-                life: 0,
-                maxLife,
+                speed, // Units per second
+                life: 0, // Time alive in seconds
+                maxLife, // Max time alive in seconds
                 tailLength,
             });
         }
 
-        function updateMeteors(delta: number) {
+        function updateEffects(delta: number) { // delta is in seconds
             meteorTimer += delta;
 
             if (meteorTimer >= nextMeteorDelay) {
                 spawnMeteor();
                 meteorTimer = 0;
-                nextMeteorDelay = Math.random() * 2 + 1.5; // 1.5~3.5 sec between meteors
+                nextMeteorDelay = Math.random() * 2 + 1.5; // Spawn a new one every 1.5 - 3.5 seconds
             }
 
+            // Update Meteors using delta time
             for (let m = activeMeteors.length - 1; m >= 0; m--) {
                 const meteor = activeMeteors[m];
-                meteor.life++;
+                meteor.life += delta; // Increase by elapsed time (seconds)
 
                 const progress = meteor.life / meteor.maxLife;
                 const fadeOut = progress > 0.6 ? 1.0 - (progress - 0.6) / 0.4 : 1.0;
-                const fadeIn = Math.min(meteor.life / 10, 1.0);
-                const opacity = fadeIn * fadeOut;
+                // Fade in quickly over first 0.2 seconds
+                const fadeIn = Math.min(meteor.life / 0.2, 1.0);
+                const opacity = Math.max(0, Math.min(1, fadeIn * fadeOut));
 
-                // Move trail points
                 const TRAIL_SEGMENTS = 20;
                 const positions = meteor.line.geometry.attributes.position.array as Float32Array;
                 const headPos = meteor.head.geometry.attributes.position.array as Float32Array;
 
-                // Move head
-                headPos[0] += meteor.direction.x * meteor.speed;
-                headPos[1] += meteor.direction.y * meteor.speed;
-                headPos[2] += meteor.direction.z * meteor.speed;
+                // Move head by speed (units/sec) * delta (sec)
+                headPos[0] += meteor.direction.x * meteor.speed * delta;
+                headPos[1] += meteor.direction.y * meteor.speed * delta;
+                headPos[2] += meteor.direction.z * meteor.speed * delta;
                 meteor.head.geometry.attributes.position.needsUpdate = true;
 
-                // Update trail
                 for (let i = 0; i < TRAIL_SEGMENTS; i++) {
                     const t = i / (TRAIL_SEGMENTS - 1);
                     positions[i * 3] = headPos[0] - meteor.direction.x * t * meteor.tailLength;
@@ -414,11 +443,9 @@ export default function StarfieldBackground() {
                 }
                 meteor.line.geometry.attributes.position.needsUpdate = true;
 
-                // Update opacity
                 (meteor.line.material as THREE.ShaderMaterial).uniforms.uOpacity.value = opacity;
                 (meteor.head.material as THREE.PointsMaterial).opacity = opacity;
 
-                // Remove dead meteors
                 if (meteor.life >= meteor.maxLife) {
                     scene.remove(meteor.line);
                     scene.remove(meteor.head);
@@ -433,12 +460,14 @@ export default function StarfieldBackground() {
 
         // ── Drift velocities for individual stars ──
         const driftVelocities = new Float32Array(STAR_COUNT * 3);
-        for (let i = 0; i < STAR_COUNT * 3; i++) {
+        const starCountTotal = STAR_COUNT;
+        for (let i = 0; i < starCountTotal * 3; i++) {
             driftVelocities[i] = (Math.random() - 0.5) * 0.08;
         }
 
         const brightDriftVelocities = new Float32Array(BRIGHT_STAR_COUNT * 3);
-        for (let i = 0; i < BRIGHT_STAR_COUNT * 3; i++) {
+        const brightStarCountTotal = BRIGHT_STAR_COUNT;
+        for (let i = 0; i < brightStarCountTotal * 3; i++) {
             brightDriftVelocities[i] = (Math.random() - 0.5) * 0.05;
         }
 
@@ -473,27 +502,28 @@ export default function StarfieldBackground() {
         window.addEventListener("resize", handleResize);
 
         // ── Animation loop ──
-        const clock = new THREE.Clock();
         let animId: number;
-        let lastTime = 0;
+        let lastTime = performance.now();
+        const startTime = lastTime;
 
         const animate = () => {
             animId = requestAnimationFrame(animate);
-            const elapsed = clock.getElapsedTime();
-            const delta = elapsed - lastTime;
-            lastTime = elapsed;
+            const currentTime = performance.now();
+            const elapsed = (currentTime - startTime) / 1000;
+            const delta = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
 
             // Update shader time
             starMaterial.uniforms.uTime.value = elapsed;
             brightMaterial.uniforms.uTime.value = elapsed;
 
-            // Update meteors
-            updateMeteors(delta);
+            // Update effects (meteors & planets)
+            updateEffects(delta);
 
             // Drift stars
             const starPos = starGeometry.attributes.position
                 .array as Float32Array;
-            for (let i = 0; i < STAR_COUNT; i++) {
+            for (let i = 0; i < starCountTotal; i++) {
                 const i3 = i * 3;
                 starPos[i3] += driftVelocities[i3];
                 starPos[i3 + 1] += driftVelocities[i3 + 1];
@@ -510,7 +540,7 @@ export default function StarfieldBackground() {
             // Drift bright stars
             const brightPos = brightGeometry.attributes.position
                 .array as Float32Array;
-            for (let i = 0; i < BRIGHT_STAR_COUNT; i++) {
+            for (let i = 0; i < brightStarCountTotal; i++) {
                 const i3 = i * 3;
                 brightPos[i3] += brightDriftVelocities[i3];
                 brightPos[i3 + 1] += brightDriftVelocities[i3 + 1];
@@ -559,6 +589,7 @@ export default function StarfieldBackground() {
                 (meteor.head.material as THREE.Material).dispose();
             });
             activeMeteors.length = 0;
+
             renderer.dispose();
             starGeometry.dispose();
             starMaterial.dispose();
