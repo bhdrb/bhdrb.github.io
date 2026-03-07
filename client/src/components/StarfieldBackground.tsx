@@ -293,41 +293,44 @@ export default function StarfieldBackground() {
             const color = meteorColors[Math.floor(Math.random() * meteorColors.length)];
             const isMobile = window.innerWidth < 768;
 
-            // Fix for resize: we capture the viewport AT THE TIME OF SPAWN.
-            // Meteors don't care if the screen resizes while they are flying.
             const aspect = window.innerWidth / window.innerHeight;
 
-            // Fixed logical height based on camera frustum at Z=500 -> Z=0 distance
-            const logicalHeight = 600;
-            const logicalWidth = logicalHeight * aspect;
+            // To ensure the meteor is ALWAYS visible regardless of how skinny the screen is,
+            // we calculate the actual vertical and horizontal size of the visible frustum at Z=0.
+            // Camera is at Z=500, FOV=60 degrees.
+            const vFovRadian = 60 * (Math.PI / 180);
+            const visibleHeight = 2 * Math.tan(vFovRadian / 2) * 500; // ~577.35
+            const visibleWidth = visibleHeight * aspect;
 
-            // Start firmly off the PRECISE left edge
-            const startX = -(logicalWidth / 2) - 100 - Math.random() * 200;
+            // Start just off the left edge (-visibleWidth / 2) with a small buffer.
+            const startX = -(visibleWidth / 2) - 50;
 
-            // Limit Y start to upper half mostly so trajectory moves down and across screen
-            // If aspect < 1 (mobile), allow a bit wider vertical range
-            const yRange = isMobile ? logicalHeight * 0.8 : logicalHeight * 0.6;
-            const startY = (Math.random() - 0.5) * yRange + (logicalHeight * 0.2); // Bias slightly upwards
+            // Height must be constrained purely to the *visible* height.
+            // Spawning too high or low on a narrow screen means the angle skips the screen entirely.
+            // Keep it comfortably within the top 80% to cross the middle optimally.
+            const maxY = visibleHeight * 0.4; // Top of the screen (approx 288)
+            const minY = -visibleHeight * 0.1; // Slightly below middle
 
-            // Meteors fly behind the UI but in front of distant stars
-            const startZ = -50 - Math.random() * 150;
+            const startY = minY + Math.random() * (maxY - minY);
+
+            // Fly close to the background stars (Z=0 plane)
+            const startZ = -50 - Math.random() * 100;
 
             const dir = new THREE.Vector3(
                 1,
-                -(Math.random() * 0.2 + 0.1), // Gentle downward slope
+                -(0.15 + Math.random() * 0.15), // Mild slope downwards (0.15 to 0.3)
                 (Math.random() - 0.5) * 0.1,
             ).normalize();
 
             // Length proportional to screen width, but bounded for extreme aspects (like ultra-wide PC)
-            const tailLength = Math.min(logicalWidth * 0.6, 800) + 100;
+            const tailLength = Math.min(visibleWidth * 0.6, 800) + 100;
 
             // DELTA-TIME: Use seconds (time) instead of frames for consistent UI speed
-            // Target crossing time in Seconds
-            const durationSeconds = isMobile ? (2.0 + Math.random() * 1.5) : (3.5 + Math.random() * 2.0);
+            // Target crossing time in Seconds (Made much slower per user request)
+            const durationSeconds = isMobile ? (4.0 + Math.random() * 2.0) : (6.0 + Math.random() * 4.0);
 
-            // Speed = Total distance to cross screen / Seconds
-            // Distance is roughly logicalWidth + startX offset + some buffer
-            const distanceToCross = logicalWidth + Math.abs(startX) + tailLength + 200;
+            // TARGET: Distance it takes to fully cross the screen + buffer
+            const distanceToCross = visibleWidth + Math.abs(startX) + tailLength + 200;
             const speed = distanceToCross / durationSeconds; // Units per second
 
             // Max life guarantees it completes the crossing + fully fades tail
@@ -352,7 +355,7 @@ export default function StarfieldBackground() {
             const trailMaterial = new THREE.ShaderMaterial({
                 uniforms: {
                     uColor: { value: color },
-                    uOpacity: { value: 1.0 },
+                    uOpacity: { value: 0.6 }, // Dimmer base opacity
                 },
                 vertexShader: `
                     attribute float alpha;
@@ -367,7 +370,8 @@ export default function StarfieldBackground() {
                     uniform float uOpacity;
                     varying float vAlpha;
                     void main() {
-                        gl_FragColor = vec4(uColor, vAlpha * uOpacity * 0.4);
+                        // Max trail brightness is much softer
+                        gl_FragColor = vec4(uColor, vAlpha * uOpacity * 0.15); 
                     }
                 `,
                 transparent: true,
@@ -376,22 +380,46 @@ export default function StarfieldBackground() {
             });
 
             const trail = new THREE.Line(trailGeometry, trailMaterial);
+            trail.frustumCulled = false; // MUST disable because we manually update vertices
             scene.add(trail);
 
             const headGeometry = new THREE.BufferGeometry();
             headGeometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array([startX, startY, startZ]), 3));
 
-            const headMaterial = new THREE.PointsMaterial({
-                color: color,
-                size: isMobile ? 8 : 6, // Increased head size slightly for better visibility
+            const headMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    uColor: { value: color },
+                    uOpacity: { value: 0.5 }, // Dimmer head opacity
+                },
+                vertexShader: `
+                    uniform float uOpacity;
+                    void main() {
+                        gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
+                        gl_PointSize = ${isMobile ? "10.0" : "8.0"}; 
+                    }
+                `,
+                fragmentShader: `
+                    uniform vec3 uColor;
+                    uniform float uOpacity;
+                    void main() {
+                        // Circular shape
+                        float dist = length(gl_PointCoord - vec2(0.5));
+                        if (dist > 0.5) discard;
+                        
+                        // Softer core, fading edge
+                        float core = smoothstep(0.5, 0.1, dist) * 0.7; // Toned down core
+                        float glow = exp(-dist * 5.0) * 0.3; // Less intense glow
+                        
+                        gl_FragColor = vec4(uColor, (core + glow) * uOpacity);
+                    }
+                `,
                 transparent: true,
-                opacity: 0.8,
-                blending: THREE.AdditiveBlending,
                 depthWrite: false,
-                sizeAttenuation: true,
+                blending: THREE.AdditiveBlending, // Kept for the ethereal glow, but colors are darker
             });
 
             const head = new THREE.Points(headGeometry, headMaterial);
+            head.frustumCulled = false; // MUST disable because we manually update vertices
             scene.add(head);
 
             activeMeteors.push({
@@ -444,7 +472,7 @@ export default function StarfieldBackground() {
                 meteor.line.geometry.attributes.position.needsUpdate = true;
 
                 (meteor.line.material as THREE.ShaderMaterial).uniforms.uOpacity.value = opacity;
-                (meteor.head.material as THREE.PointsMaterial).opacity = opacity;
+                (meteor.head.material as THREE.ShaderMaterial).uniforms.uOpacity.value = opacity;
 
                 if (meteor.life >= meteor.maxLife) {
                     scene.remove(meteor.line);
