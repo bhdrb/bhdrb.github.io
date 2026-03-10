@@ -1,5 +1,7 @@
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import APP_CONFIGS from "../appConfigs";
 
 /**
  * PIXEL ONE 홈페이지
@@ -49,6 +51,23 @@ const glowPulseTransition = {
 
 export default function Home() {
   const [, setLocation] = useLocation();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // 바깥 클릭 시 메뉴 닫기
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    }
+    if (isMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isMenuOpen]);
+
+  const appEntries = Object.entries(APP_CONFIGS);
 
   return (
     <div className="min-h-screen text-gray-100 flex flex-col items-center justify-center p-4 overflow-hidden relative">
@@ -151,20 +170,53 @@ export default function Home() {
         </motion.p>
       </motion.div>
 
-      {/* 하단 개인정보처리방침 링크 */}
+      {/* 하단 개인정보처리방침 드롭업 메뉴 */}
       <motion.div
+        ref={menuRef}
         className="absolute bottom-8 z-10"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 2.5, duration: 1 }}
       >
+        {/* 드롭업 팝오버 */}
+        <AnimatePresence>
+          {isMenuOpen && (
+            <motion.div
+              className="privacy-popover"
+              initial={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
+              animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
+              exit={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+            >
+              {appEntries.map(([key, config]) => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    setLocation(`/privacy?app=${key}`);
+                  }}
+                  className="privacy-popover-item"
+                >
+                  {config.appName.replace(/'/g, "")}
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 트리거 버튼 */}
         <button
-          onClick={() => setLocation("/privacy?app=trash_day_kr")}
-          className="privacy-link text-sm"
+          onClick={() => setIsMenuOpen((prev) => !prev)}
+          className="privacy-dot"
+          aria-label="개인정보처리방침"
         >
-          [우리동네 분리배출] 개인정보처리방침
+          <span className="privacy-ripple" style={{ animationDelay: "0s" }} />
+          <span className="privacy-ripple" style={{ animationDelay: "1s" }} />
+          <span className="privacy-ripple" style={{ animationDelay: "2s" }} />
+          ■
         </button>
       </motion.div>
     </div>
   );
 }
+

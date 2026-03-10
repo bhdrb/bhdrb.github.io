@@ -25,15 +25,14 @@ const APP_CONFIGS: Record<string, AppPrivacyConfig> = {
             { date: "2026년 2월 27일", label: "현행" },
         ],
     },
-    // ── 새로운 앱 예시 (필요 시 주석 해제 후 수정) ──
-    // "another-app": {
-    //   companyName: "Another App",
-    //   appName: "ANOTHER APP",
-    //   effectiveDate: "2026년 3월 1일",
-    //   revisionHistory: [
-    //     { date: "2026년 3월 1일", label: "현행" },
-    //   ],
-    // },
+    "local_festival": {
+        companyName: "Pixel One",
+        appName: "'지역축제 알리미'",
+        effectiveDate: "2026년 3월 10일",
+        revisionHistory: [
+            { date: "2026년 3월 10일", label: "현행" },
+        ],
+    },
 };
 
 /** 기본 앱 키 — 쿼리 없이 /privacy 접근 시 사용 */
