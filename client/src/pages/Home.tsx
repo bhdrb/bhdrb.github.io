@@ -139,7 +139,8 @@ export default function Home() {
         {/* 회사 타이틀 */}
         <motion.h1
           variants={itemVariants}
-          className="title-gradient text-5xl sm:text-6xl md:text-7xl font-bold tracking-widest"
+          className="title-gradient font-bold tracking-widest"
+          style={{ fontSize: "clamp(2.75rem, 8vw, 5rem)" }}
         >
           <motion.span
             animate={glowPulseAnimate}
