@@ -499,6 +499,92 @@ export default function StarfieldBackground() {
             brightDriftVelocities[i] = (Math.random() - 0.5) * 0.05;
         }
 
+        // ── Diamond Convergence State ──
+        const convergence = {
+            active: false,
+            phase: 'idle' as 'idle' | 'converging' | 'burst' | 'returning',
+            targetX: 0,
+            targetY: 0,
+            targetZ: 0,
+            timer: 0,
+            convergeDuration: 2.5,
+            burstDuration: 0.6,
+            returnDuration: 2.0,
+            savedStarPositions: null as Float32Array | null,
+            savedBrightPositions: null as Float32Array | null,
+        };
+
+        // Easing function: easeInOutCubic
+        function easeInOutCubic(t: number): number {
+            return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        }
+        // Easing: easeOutQuart for return
+        function easeOutQuart(t: number): number {
+            return 1 - Math.pow(1 - t, 4);
+        }
+
+        // ── Glow burst sprite (hidden until burst phase) ──
+        const burstTexture = (() => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d')!;
+            const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+            gradient.addColorStop(0, 'rgba(200, 180, 255, 1)');
+            gradient.addColorStop(0.2, 'rgba(150, 140, 255, 0.8)');
+            gradient.addColorStop(0.5, 'rgba(100, 120, 255, 0.3)');
+            gradient.addColorStop(1, 'rgba(50, 50, 150, 0)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 256, 256);
+            return new THREE.CanvasTexture(canvas);
+        })();
+
+        const burstSpriteMaterial = new THREE.SpriteMaterial({
+            map: burstTexture,
+            color: 0xc8b4ff,
+            transparent: true,
+            opacity: 0,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+        });
+        const burstSprite = new THREE.Sprite(burstSpriteMaterial);
+        burstSprite.scale.set(0, 0, 1);
+        scene.add(burstSprite);
+
+        // ── Handle diamond-click custom event ──
+        const handleDiamondClick = (e: Event) => {
+            if (convergence.active) return; // prevent re-trigger
+            const detail = (e as CustomEvent).detail;
+            const screenX = detail.x;
+            const screenY = detail.y;
+
+            // Convert screen coords to Three.js world coords
+            const ndcX = (screenX / window.innerWidth) * 2 - 1;
+            const ndcY = -(screenY / window.innerHeight) * 2 + 1;
+            const vec = new THREE.Vector3(ndcX, ndcY, 0.5);
+            vec.unproject(camera);
+            const dir = vec.sub(camera.position).normalize();
+            const dist = -camera.position.z / dir.z;
+            const worldPos = camera.position.clone().add(dir.multiplyScalar(dist));
+
+            convergence.targetX = worldPos.x;
+            convergence.targetY = worldPos.y;
+            convergence.targetZ = 0;
+            convergence.active = true;
+            convergence.phase = 'converging';
+            convergence.timer = 0;
+
+            // Save current positions
+            const sp = starGeometry.attributes.position.array as Float32Array;
+            convergence.savedStarPositions = new Float32Array(sp);
+            const bp = brightGeometry.attributes.position.array as Float32Array;
+            convergence.savedBrightPositions = new Float32Array(bp);
+
+            // Position burst sprite at target
+            burstSprite.position.set(convergence.targetX, convergence.targetY, convergence.targetZ + 1);
+        };
+        window.addEventListener('diamond-click', handleDiamondClick);
+
         // ── Mouse parallax ──
         const mouse = { x: 0, y: 0, targetX: 0, targetY: 0 };
 
@@ -545,43 +631,110 @@ export default function StarfieldBackground() {
             starMaterial.uniforms.uTime.value = elapsed;
             brightMaterial.uniforms.uTime.value = elapsed;
 
-            // Update effects (meteors & planets)
-            updateEffects(delta);
+            const starPos = starGeometry.attributes.position.array as Float32Array;
+            const brightPos = brightGeometry.attributes.position.array as Float32Array;
 
-            // Drift stars
-            const starPos = starGeometry.attributes.position
-                .array as Float32Array;
-            for (let i = 0; i < starCountTotal; i++) {
-                const i3 = i * 3;
-                starPos[i3] += driftVelocities[i3];
-                starPos[i3 + 1] += driftVelocities[i3 + 1];
-                starPos[i3 + 2] += driftVelocities[i3 + 2];
+            // ── Convergence animation ──
+            if (convergence.active) {
+                convergence.timer += delta;
+                const { phase, targetX, targetY, targetZ, savedStarPositions, savedBrightPositions } = convergence;
 
-                // Wrap around bounds
-                if (Math.abs(starPos[i3]) > 1000) driftVelocities[i3] *= -1;
-                if (Math.abs(starPos[i3 + 1]) > 1000)
-                    driftVelocities[i3 + 1] *= -1;
-                if (Math.abs(starPos[i3 + 2]) > 750) driftVelocities[i3 + 2] *= -1;
+                if (phase === 'converging') {
+                    const t = Math.min(convergence.timer / convergence.convergeDuration, 1);
+                    const ease = easeInOutCubic(t);
+
+                    // Move all stars toward target
+                    for (let i = 0; i < starCountTotal; i++) {
+                        const i3 = i * 3;
+                        starPos[i3] = savedStarPositions![i3] + (targetX - savedStarPositions![i3]) * ease;
+                        starPos[i3 + 1] = savedStarPositions![i3 + 1] + (targetY - savedStarPositions![i3 + 1]) * ease;
+                        starPos[i3 + 2] = savedStarPositions![i3 + 2] + (targetZ - savedStarPositions![i3 + 2]) * ease;
+                    }
+                    for (let i = 0; i < brightStarCountTotal; i++) {
+                        const i3 = i * 3;
+                        brightPos[i3] = savedBrightPositions![i3] + (targetX - savedBrightPositions![i3]) * ease;
+                        brightPos[i3 + 1] = savedBrightPositions![i3 + 1] + (targetY - savedBrightPositions![i3 + 1]) * ease;
+                        brightPos[i3 + 2] = savedBrightPositions![i3 + 2] + (targetZ - savedBrightPositions![i3 + 2]) * ease;
+                    }
+
+                    if (t >= 1) {
+                        convergence.phase = 'burst';
+                        convergence.timer = 0;
+                        // Dispatch event so Home component can react
+                        window.dispatchEvent(new CustomEvent('diamond-burst'));
+                    }
+                } else if (phase === 'burst') {
+                    const t = Math.min(convergence.timer / convergence.burstDuration, 1);
+                    // Glow burst sprite expands and fades
+                    const scale = t < 0.3 ? (t / 0.3) * 400 : 400 + (t - 0.3) * 600;
+                    burstSprite.scale.set(scale, scale, 1);
+                    burstSpriteMaterial.opacity = t < 0.3 ? t / 0.3 * 0.9 : 0.9 * (1 - (t - 0.3) / 0.7);
+
+                    if (t >= 1) {
+                        convergence.phase = 'returning';
+                        convergence.timer = 0;
+                        burstSpriteMaterial.opacity = 0;
+                        burstSprite.scale.set(0, 0, 1);
+                    }
+                } else if (phase === 'returning') {
+                    const t = Math.min(convergence.timer / convergence.returnDuration, 1);
+                    const ease = easeOutQuart(t);
+
+                    // Return stars from target back to saved positions
+                    for (let i = 0; i < starCountTotal; i++) {
+                        const i3 = i * 3;
+                        starPos[i3] = targetX + (savedStarPositions![i3] - targetX) * ease;
+                        starPos[i3 + 1] = targetY + (savedStarPositions![i3 + 1] - targetY) * ease;
+                        starPos[i3 + 2] = targetZ + (savedStarPositions![i3 + 2] - targetZ) * ease;
+                    }
+                    for (let i = 0; i < brightStarCountTotal; i++) {
+                        const i3 = i * 3;
+                        brightPos[i3] = targetX + (savedBrightPositions![i3] - targetX) * ease;
+                        brightPos[i3 + 1] = targetY + (savedBrightPositions![i3 + 1] - targetY) * ease;
+                        brightPos[i3 + 2] = targetZ + (savedBrightPositions![i3 + 2] - targetZ) * ease;
+                    }
+
+                    if (t >= 1) {
+                        convergence.active = false;
+                        convergence.phase = 'idle';
+                        convergence.savedStarPositions = null;
+                        convergence.savedBrightPositions = null;
+                        // Dispatch event so Home component resets
+                        window.dispatchEvent(new CustomEvent('diamond-reset'));
+                    }
+                }
+
+                starGeometry.attributes.position.needsUpdate = true;
+                brightGeometry.attributes.position.needsUpdate = true;
+            } else {
+                // ── Normal drift (only when NOT converging) ──
+                // Update effects (meteors & planets)
+                updateEffects(delta);
+
+                // Drift stars
+                for (let i = 0; i < starCountTotal; i++) {
+                    const i3 = i * 3;
+                    starPos[i3] += driftVelocities[i3];
+                    starPos[i3 + 1] += driftVelocities[i3 + 1];
+                    starPos[i3 + 2] += driftVelocities[i3 + 2];
+                    if (Math.abs(starPos[i3]) > 1000) driftVelocities[i3] *= -1;
+                    if (Math.abs(starPos[i3 + 1]) > 1000) driftVelocities[i3 + 1] *= -1;
+                    if (Math.abs(starPos[i3 + 2]) > 750) driftVelocities[i3 + 2] *= -1;
+                }
+                starGeometry.attributes.position.needsUpdate = true;
+
+                // Drift bright stars
+                for (let i = 0; i < brightStarCountTotal; i++) {
+                    const i3 = i * 3;
+                    brightPos[i3] += brightDriftVelocities[i3];
+                    brightPos[i3 + 1] += brightDriftVelocities[i3 + 1];
+                    brightPos[i3 + 2] += brightDriftVelocities[i3 + 2];
+                    if (Math.abs(brightPos[i3]) > 900) brightDriftVelocities[i3] *= -1;
+                    if (Math.abs(brightPos[i3 + 1]) > 900) brightDriftVelocities[i3 + 1] *= -1;
+                    if (Math.abs(brightPos[i3 + 2]) > 400) brightDriftVelocities[i3 + 2] *= -1;
+                }
+                brightGeometry.attributes.position.needsUpdate = true;
             }
-            starGeometry.attributes.position.needsUpdate = true;
-
-            // Drift bright stars
-            const brightPos = brightGeometry.attributes.position
-                .array as Float32Array;
-            for (let i = 0; i < brightStarCountTotal; i++) {
-                const i3 = i * 3;
-                brightPos[i3] += brightDriftVelocities[i3];
-                brightPos[i3 + 1] += brightDriftVelocities[i3 + 1];
-                brightPos[i3 + 2] += brightDriftVelocities[i3 + 2];
-
-                if (Math.abs(brightPos[i3]) > 900)
-                    brightDriftVelocities[i3] *= -1;
-                if (Math.abs(brightPos[i3 + 1]) > 900)
-                    brightDriftVelocities[i3 + 1] *= -1;
-                if (Math.abs(brightPos[i3 + 2]) > 400)
-                    brightDriftVelocities[i3 + 2] *= -1;
-            }
-            brightGeometry.attributes.position.needsUpdate = true;
 
             // Rotate nebula very slowly
             nebulaGroup.rotation.z += 0.0001;
@@ -607,6 +760,7 @@ export default function StarfieldBackground() {
             cancelAnimationFrame(animId);
             window.removeEventListener("mousemove", handleMouseMove);
             window.removeEventListener("resize", handleResize);
+            window.removeEventListener('diamond-click', handleDiamondClick);
             // Clean up meteors
             activeMeteors.forEach((meteor) => {
                 scene.remove(meteor.line);
@@ -617,6 +771,11 @@ export default function StarfieldBackground() {
                 (meteor.head.material as THREE.Material).dispose();
             });
             activeMeteors.length = 0;
+
+            // Clean up burst sprite
+            scene.remove(burstSprite);
+            burstSpriteMaterial.dispose();
+            burstTexture.dispose();
 
             renderer.dispose();
             starGeometry.dispose();
