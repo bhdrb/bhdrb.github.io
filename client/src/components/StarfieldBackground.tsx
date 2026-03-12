@@ -500,6 +500,11 @@ export default function StarfieldBackground() {
         }
 
         // ── Diamond Convergence State ──
+        interface SavedMeteorData {
+            headX: number; headY: number; headZ: number;
+            direction: THREE.Vector3;
+            tailLength: number;
+        }
         const convergence = {
             active: false,
             phase: 'idle' as 'idle' | 'converging' | 'burst' | 'returning',
@@ -512,6 +517,7 @@ export default function StarfieldBackground() {
             returnDuration: 2.0,
             savedStarPositions: null as Float32Array | null,
             savedBrightPositions: null as Float32Array | null,
+            savedMeteorData: null as SavedMeteorData[] | null,
         };
 
         // Easing function: easeInOutCubic
@@ -579,6 +585,16 @@ export default function StarfieldBackground() {
             convergence.savedStarPositions = new Float32Array(sp);
             const bp = brightGeometry.attributes.position.array as Float32Array;
             convergence.savedBrightPositions = new Float32Array(bp);
+
+            // Save meteor positions
+            convergence.savedMeteorData = activeMeteors.map(m => {
+                const hp = m.head.geometry.attributes.position.array as Float32Array;
+                return {
+                    headX: hp[0], headY: hp[1], headZ: hp[2],
+                    direction: m.direction.clone(),
+                    tailLength: m.tailLength,
+                };
+            });
 
             // Position burst sprite at target
             burstSprite.position.set(convergence.targetX, convergence.targetY, convergence.targetZ + 1);
@@ -657,7 +673,53 @@ export default function StarfieldBackground() {
                         brightPos[i3 + 2] = savedBrightPositions![i3 + 2] + (targetZ - savedBrightPositions![i3 + 2]) * ease;
                     }
 
+                    // Move meteors toward target
+                    const { savedMeteorData } = convergence;
+                    if (savedMeteorData) {
+                        for (let m = 0; m < activeMeteors.length; m++) {
+                            const meteor = activeMeteors[m];
+                            const saved = savedMeteorData[m];
+                            const headPos = meteor.head.geometry.attributes.position.array as Float32Array;
+
+                            // Lerp head position toward target
+                            headPos[0] = saved.headX + (targetX - saved.headX) * ease;
+                            headPos[1] = saved.headY + (targetY - saved.headY) * ease;
+                            headPos[2] = saved.headZ + (targetZ - saved.headZ) * ease;
+                            meteor.head.geometry.attributes.position.needsUpdate = true;
+
+                            // Collapse trail as convergence progresses
+                            const TRAIL_SEGMENTS = 20;
+                            const positions = meteor.line.geometry.attributes.position.array as Float32Array;
+                            const shrunkTail = saved.tailLength * (1 - ease);
+                            for (let i = 0; i < TRAIL_SEGMENTS; i++) {
+                                const tt = i / (TRAIL_SEGMENTS - 1);
+                                positions[i * 3] = headPos[0] - saved.direction.x * tt * shrunkTail;
+                                positions[i * 3 + 1] = headPos[1] - saved.direction.y * tt * shrunkTail;
+                                positions[i * 3 + 2] = headPos[2] - saved.direction.z * tt * shrunkTail;
+                            }
+                            meteor.line.geometry.attributes.position.needsUpdate = true;
+
+                            // Fade out meteor opacity
+                            (meteor.line.material as THREE.ShaderMaterial).uniforms.uOpacity.value = 0.6 * (1 - ease);
+                            (meteor.head.material as THREE.ShaderMaterial).uniforms.uOpacity.value = 0.5 * (1 - ease);
+                        }
+                    }
+
                     if (t >= 1) {
+                        // Cleanup all meteors at convergence point
+                        for (let m = activeMeteors.length - 1; m >= 0; m--) {
+                            const meteor = activeMeteors[m];
+                            scene.remove(meteor.line);
+                            scene.remove(meteor.head);
+                            meteor.line.geometry.dispose();
+                            (meteor.line.material as THREE.Material).dispose();
+                            meteor.head.geometry.dispose();
+                            (meteor.head.material as THREE.Material).dispose();
+                        }
+                        activeMeteors.length = 0;
+                        convergence.savedMeteorData = null;
+                        meteorTimer = 0;
+
                         convergence.phase = 'burst';
                         convergence.timer = 0;
                         // Dispatch event so Home component can react

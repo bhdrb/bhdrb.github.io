@@ -45,3 +45,36 @@
 - **제목**: Playfair Display (세리프, 고급스러움)
 - **본문**: Inter (산세리프, 가독성)
 - **링크**: Inter 일반체, 언더라인 호버 효과
+
+---
+
+## 별빛 수렴 빅뱅 효과 (Starfield Convergence & Big Bang)
+
+### 개요
+홈 화면 중앙의 다이아몬드(◆) 로고를 클릭하면 모든 별이 다이아몬드 위치로 모여든 뒤 빅뱅처럼 폭발하고, 다시 원래 위치로 돌아가는 인터랙티브 애니메이션.
+
+### 애니메이션 시퀀스
+1. **수렴 (Converging)** — 2.5초
+   - 모든 별(일반 별 + 밝은 별)이 다이아몬드 위치로 흡수됨
+   - `easeInOutCubic` 이징으로 자연스러운 가속/감속
+   - 수렴 중 유성·별 드리프트는 일시 정지
+
+2. **폭발 (Burst)** — 0.6초
+   - 보라빛 글로우 스프라이트가 급격히 팽창하며 화면을 덮음
+   - 팽창 후 빠르게 페이드아웃
+   - `diamond-burst` 커스텀 이벤트 발생 → Home 컴포넌트 반응
+
+3. **복귀 (Returning)** — 2.0초
+   - 별들이 저장된 원래 좌표로 부드럽게 복귀
+   - `easeOutQuart` 이징 적용
+   - 복귀 완료 후 `diamond-reset` 이벤트 → UI 원상 복구
+
+### 기술 구현
+- **이벤트 흐름**: Home 컴포넌트 → `diamond-click` 커스텀 이벤트 → StarfieldBackground 수신
+- **좌표 변환**: 스크린 좌표 → NDC → Three.js 월드 좌표 (unproject)
+- **위치 보존**: 수렴 시작 시 모든 별의 현재 좌표를 `savedStarPositions` / `savedBrightPositions`에 복사
+- **버스트 효과**: `CanvasTexture`로 생성한 방사형 그라디언트 스프라이트 (보라빛 계열)
+
+### 관련 파일
+- `StarfieldBackground.tsx` — 수렴/폭발/복귀 로직 (convergence 상태 머신)
+- `Home.tsx` — 다이아몬드 클릭 핸들러, `diamond-click` 이벤트 발송
