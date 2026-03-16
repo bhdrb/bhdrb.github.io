@@ -88,6 +88,7 @@ export default function StarfieldBackground() {
             uniforms: {
                 uTime: { value: 0 },
                 uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
+                uConvergeScale: { value: 1.0 },
             },
             vertexShader: `
         attribute float size;
@@ -96,6 +97,7 @@ export default function StarfieldBackground() {
         varying float vAlpha;
         uniform float uTime;
         uniform float uPixelRatio;
+        uniform float uConvergeScale;
 
         void main() {
           vColor = color;
@@ -109,9 +111,9 @@ export default function StarfieldBackground() {
           vec4 projectedPosition = projectionMatrix * viewPosition;
 
           gl_Position = projectedPosition;
-          // Further increased size factor
-          gl_PointSize = size * uPixelRatio * (550.0 / -viewPosition.z);
-          gl_PointSize = max(gl_PointSize, 2.0);
+          // Further increased size factor, scaled by convergence
+          gl_PointSize = size * uPixelRatio * (550.0 / -viewPosition.z) * uConvergeScale;
+          gl_PointSize = max(gl_PointSize, 1.0);
         }
       `,
             fragmentShader: `
@@ -176,6 +178,7 @@ export default function StarfieldBackground() {
             uniforms: {
                 uTime: { value: 0 },
                 uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
+                uConvergeScale: { value: 1.0 },
             },
             vertexShader: `
         attribute float size;
@@ -184,6 +187,7 @@ export default function StarfieldBackground() {
         varying float vAlpha;
         uniform float uTime;
         uniform float uPixelRatio;
+        uniform float uConvergeScale;
 
         void main() {
           vColor = color;
@@ -197,9 +201,9 @@ export default function StarfieldBackground() {
           vec4 projectedPosition = projectionMatrix * viewPosition;
 
           gl_Position = projectedPosition;
-          // Further increased size factor
-          gl_PointSize = size * uPixelRatio * (750.0 / -viewPosition.z);
-          gl_PointSize = max(gl_PointSize, 4.0);
+          // Further increased size factor, scaled by convergence
+          gl_PointSize = size * uPixelRatio * (750.0 / -viewPosition.z) * uConvergeScale;
+          gl_PointSize = max(gl_PointSize, 1.0);
         }
       `,
             fragmentShader: `
@@ -507,13 +511,14 @@ export default function StarfieldBackground() {
         }
         const convergence = {
             active: false,
-            phase: 'idle' as 'idle' | 'converging' | 'burst' | 'returning',
+            phase: 'idle' as 'idle' | 'converging' | 'burst' | 'pause' | 'returning',
             targetX: 0,
             targetY: 0,
             targetZ: 0,
             timer: 0,
             convergeDuration: 2.5,
             burstDuration: 0.6,
+            pauseDuration: 0.5,
             returnDuration: 2.0,
             savedStarPositions: null as Float32Array | null,
             savedBrightPositions: null as Float32Array | null,
@@ -659,6 +664,10 @@ export default function StarfieldBackground() {
                     const t = Math.min(convergence.timer / convergence.convergeDuration, 1);
                     const ease = easeInOutCubic(t);
 
+                    // Shrink stars as they converge (1.0 → 0.08)
+                    const sizeScale = 1.0 - ease * 0.92;
+                    starMaterial.uniforms.uConvergeScale.value = sizeScale;
+                    brightMaterial.uniforms.uConvergeScale.value = sizeScale;
                     // Move all stars toward target
                     for (let i = 0; i < starCountTotal; i++) {
                         const i3 = i * 3;
@@ -720,6 +729,12 @@ export default function StarfieldBackground() {
                         convergence.savedMeteorData = null;
                         meteorTimer = 0;
 
+                        convergence.phase = 'pause';
+                        convergence.timer = 0;
+                    }
+                } else if (phase === 'pause') {
+                    // Hold for 0.5s after convergence before burst
+                    if (convergence.timer >= convergence.pauseDuration) {
                         convergence.phase = 'burst';
                         convergence.timer = 0;
                         // Dispatch event so Home component can react
@@ -741,6 +756,11 @@ export default function StarfieldBackground() {
                 } else if (phase === 'returning') {
                     const t = Math.min(convergence.timer / convergence.returnDuration, 1);
                     const ease = easeOutQuart(t);
+
+                    // Grow stars back (0.08 → 1.0)
+                    const sizeScale = 0.08 + ease * 0.92;
+                    starMaterial.uniforms.uConvergeScale.value = sizeScale;
+                    brightMaterial.uniforms.uConvergeScale.value = sizeScale;
 
                     // Return stars from target back to saved positions
                     for (let i = 0; i < starCountTotal; i++) {
