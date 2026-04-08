@@ -19,7 +19,7 @@ export interface AppPrivacyConfig {
 const APP_CONFIGS: Record<string, AppPrivacyConfig> = {
     "trash_day_kr": {
         companyName: "Pixel One",
-        appName: "'우리동네 분리배출'",
+        appName: "'우리동네 분리배출 알림'",
         effectiveDate: "2026년 2월 27일",
         revisionHistory: [
             { date: "2026년 2월 27일", label: "현행" },
