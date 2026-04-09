@@ -25,12 +25,20 @@ const APP_CONFIGS: Record<string, AppPrivacyConfig> = {
             { date: "2026년 2월 27일", label: "현행" },
         ],
     },
-    "local_festival": {
+    // "local_festival": {
+    //     companyName: "Pixel One",
+    //     appName: "'지역축제 알리미'",
+    //     effectiveDate: "2026년 3월 10일",
+    //     revisionHistory: [
+    //         { date: "2026년 3월 10일", label: "현행" },
+    //     ],
+    // },
+    "fiveday_parking_alert": {
         companyName: "Pixel One",
-        appName: "'지역축제 알리미'",
-        effectiveDate: "2026년 3월 10일",
+        appName: "'공영 5부제 알리미'",
+        effectiveDate: "2026년 4월 10일",
         revisionHistory: [
-            { date: "2026년 3월 10일", label: "현행" },
+            { date: "2026년 4월 10일", label: "현행" },
         ],
     },
 };
