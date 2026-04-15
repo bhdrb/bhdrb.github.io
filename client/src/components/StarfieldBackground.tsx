@@ -230,6 +230,72 @@ export default function StarfieldBackground() {
         const brightStars = new THREE.Points(brightGeometry, brightMaterial);
         scene.add(brightStars);
 
+        // ── Sparkle Particles (Newborn Star Dust) ──
+        const SPARKLE_COUNT = isMobile ? 3000 : 5000;
+        const sparkleGeometry = new THREE.BufferGeometry();
+        const sparklePositions = new Float32Array(SPARKLE_COUNT * 3);
+        const sparklePhases = new Float32Array(SPARKLE_COUNT);
+
+        for (let i = 0; i < SPARKLE_COUNT; i++) {
+            const i3 = i * 3;
+            sparklePositions[i3] = (Math.random() - 0.5) * 2000;
+            sparklePositions[i3 + 1] = (Math.random() - 0.5) * 2000;
+            sparklePositions[i3 + 2] = (Math.random() - 0.5) * 1500;
+            sparklePhases[i] = Math.random() * Math.PI * 2;
+        }
+
+        sparkleGeometry.setAttribute("position", new THREE.BufferAttribute(sparklePositions, 3));
+        sparkleGeometry.setAttribute("phase", new THREE.BufferAttribute(sparklePhases, 1));
+
+        const sparkleMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                uTime: { value: 0 },
+                uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
+                uSparkleIntensity: { value: 0.0 }, // controlled by sparkleEffect
+            },
+            vertexShader: `
+        attribute float phase;
+        varying float vAlpha;
+        uniform float uTime;
+        uniform float uPixelRatio;
+        uniform float uSparkleIntensity;
+
+        void main() {
+          // Fast twinkling
+          float twinkle = sin(uTime * 10.0 + phase) * 0.5 + 0.5;
+          vAlpha = twinkle * uSparkleIntensity;
+
+          vec4 modelPosition = modelMatrix * vec4(position, 1.0);
+          vec4 viewPosition = viewMatrix * modelPosition;
+          
+          gl_Position = projectionMatrix * viewPosition;
+          
+          // Random slight variance in size based on phase
+          float baseSize = 2.0 + sin(phase) * 1.5;
+          gl_PointSize = baseSize * uPixelRatio * (600.0 / -viewPosition.z);
+          gl_PointSize = max(gl_PointSize, 1.0);
+        }
+      `,
+            fragmentShader: `
+        varying float vAlpha;
+        void main() {
+          if (vAlpha <= 0.0) discard;
+          float dist = length(gl_PointCoord - vec2(0.5));
+          if (dist > 0.5) discard;
+          
+          float core = smoothstep(0.5, 0.1, dist);
+          // Sparkle color: light yellow/white
+          gl_FragColor = vec4(1.0, 0.98, 0.85, core * vAlpha);
+        }
+      `,
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+        });
+
+        const sparklePoints = new THREE.Points(sparkleGeometry, sparkleMaterial);
+        scene.add(sparklePoints);
+
         // ── Nebula Clouds (soft glowing sprites) ──
         const nebulaColors = [
             { color: 0x1a0a3e, opacity: 0.04 }, // deep purple
@@ -509,6 +575,15 @@ export default function StarfieldBackground() {
             direction: THREE.Vector3;
             tailLength: number;
         }
+
+        const sparkleEffect = {
+            active: false,
+            timer: 0,
+            delay: 1.2, // 1.2초 뒤부터 켜짐
+            sustainDuration: 10.0,
+            fadeDuration: 5.0,
+        };
+
         const convergence = {
             active: false,
             phase: 'idle' as 'idle' | 'converging' | 'burst' | 'pause' | 'returning',
@@ -652,6 +727,29 @@ export default function StarfieldBackground() {
             starMaterial.uniforms.uTime.value = elapsed;
             brightMaterial.uniforms.uTime.value = elapsed;
 
+            // Update custom sparkle dust time
+            sparkleMaterial.uniforms.uTime.value = elapsed;
+
+            if (sparkleEffect.active) {
+                sparkleEffect.timer += delta;
+                let intensity = 0.0;
+
+                if (sparkleEffect.timer > sparkleEffect.delay) {
+                    const activeTime = sparkleEffect.timer - sparkleEffect.delay;
+                    if (activeTime < sparkleEffect.sustainDuration) {
+                        intensity = 1.0;
+                    } else if (activeTime < sparkleEffect.sustainDuration + sparkleEffect.fadeDuration) {
+                        const fadeRatio = (activeTime - sparkleEffect.sustainDuration) / sparkleEffect.fadeDuration;
+                        intensity = 1.0 - fadeRatio;
+                    } else {
+                        intensity = 0.0;
+                        sparkleEffect.active = false;
+                    }
+                }
+
+                sparkleMaterial.uniforms.uSparkleIntensity.value = intensity;
+            }
+
             const starPos = starGeometry.attributes.position.array as Float32Array;
             const brightPos = brightGeometry.attributes.position.array as Float32Array;
 
@@ -739,6 +837,10 @@ export default function StarfieldBackground() {
                         convergence.timer = 0;
                         // Dispatch event so Home component can react
                         window.dispatchEvent(new CustomEvent('diamond-burst'));
+
+                        // Activate sparkle effect timer (will delay for 1.0s before showing)
+                        sparkleEffect.active = true;
+                        sparkleEffect.timer = 0;
                     }
                 } else if (phase === 'burst') {
                     const t = Math.min(convergence.timer / convergence.burstDuration, 1);
@@ -781,6 +883,7 @@ export default function StarfieldBackground() {
                         convergence.phase = 'idle';
                         convergence.savedStarPositions = null;
                         convergence.savedBrightPositions = null;
+
                         // Dispatch event so Home component resets
                         window.dispatchEvent(new CustomEvent('diamond-reset'));
                     }
@@ -831,6 +934,7 @@ export default function StarfieldBackground() {
             // Very slow global rotation for depth
             stars.rotation.y += 0.00005;
             brightStars.rotation.y += 0.00003;
+            sparklePoints.rotation.y += 0.00008; // slightly faster global spin
 
             renderer.render(scene, camera);
         };
@@ -864,6 +968,8 @@ export default function StarfieldBackground() {
             starMaterial.dispose();
             brightGeometry.dispose();
             brightMaterial.dispose();
+            sparkleGeometry.dispose();
+            sparkleMaterial.dispose();
             nebulaGroup.children.forEach((child) => {
                 if (child instanceof THREE.Mesh) {
                     child.geometry.dispose();
