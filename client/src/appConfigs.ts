@@ -41,6 +41,14 @@ const APP_CONFIGS: Record<string, AppPrivacyConfig> = {
             { date: "2026년 4월 10일", label: "현행" },
         ],
     },
+    "high_oil_price_relief_payment": {
+        companyName: "Pixel One",
+        appName: "'고유가 피해지원금 캘린더'",
+        effectiveDate: "2026년 4월 17일",
+        revisionHistory: [
+            { date: "2026년 4월 17일", label: "현행" },
+        ],
+    },
 };
 
 /** 기본 앱 키 — 쿼리 없이 /privacy 접근 시 사용 */
