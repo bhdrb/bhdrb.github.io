@@ -854,6 +854,20 @@ export default function StarfieldBackground() {
                         convergence.timer = 0;
                         burstSpriteMaterial.opacity = 0;
                         burstSprite.scale.set(0, 0, 1);
+
+                        // 빅뱅(Burst) 이후 별들이 기존 위치가 아닌 새로운 무작위 위치로 재배치되도록 좌표 업데이트
+                        for (let i = 0; i < starCountTotal; i++) {
+                            const i3 = i * 3;
+                            convergence.savedStarPositions![i3] = (Math.random() - 0.5) * 2000;
+                            convergence.savedStarPositions![i3 + 1] = (Math.random() - 0.5) * 2000;
+                            convergence.savedStarPositions![i3 + 2] = (Math.random() - 0.5) * 1500;
+                        }
+                        for (let i = 0; i < brightStarCountTotal; i++) {
+                            const i3 = i * 3;
+                            convergence.savedBrightPositions![i3] = (Math.random() - 0.5) * 1800;
+                            convergence.savedBrightPositions![i3 + 1] = (Math.random() - 0.5) * 1800;
+                            convergence.savedBrightPositions![i3 + 2] = (Math.random() - 0.5) * 800;
+                        }
                     }
                 } else if (phase === 'returning') {
                     const t = Math.min(convergence.timer / convergence.returnDuration, 1);
