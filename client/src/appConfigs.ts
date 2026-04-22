@@ -35,7 +35,7 @@ const APP_CONFIGS: Record<string, AppPrivacyConfig> = {
     // },
     "fiveday_parking_alert": {
         companyName: "Pixel One",
-        appName: "'공영 5부제 알리미'",
+        appName: "'서울 공영주차장 5부제 알리미 - 주차 요일제 필수앱'",
         effectiveDate: "2026년 4월 10일",
         revisionHistory: [
             { date: "2026년 4월 10일", label: "현행" },
@@ -47,6 +47,14 @@ const APP_CONFIGS: Record<string, AppPrivacyConfig> = {
         effectiveDate: "2026년 4월 17일",
         revisionHistory: [
             { date: "2026년 4월 17일", label: "현행" },
+        ],
+    },
+    "eitc_ctc_calendar": {
+        companyName: "Pixel One",
+        appName: "'근로장려금 자녀장려금 일정 알리미'",
+        effectiveDate: "2026년 4월 22일",
+        revisionHistory: [
+            { date: "2026년 4월 22일", label: "현행" },
         ],
     },
 };
